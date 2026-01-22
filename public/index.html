@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Detektor (Ollama)</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f4f4f9; }
+        h1 { color: #333; text-align: center; }
+        textarea { width: 100%; height: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; resize: vertical; }
+        button { display: block; width: 100%; padding: 15px; margin-top: 20px; background-color: #007BFF; color: white; border: none; border-radius: 5px; font-size: 18px; cursor: pointer; transition: background 0.3s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #result { margin-top: 30px; padding: 20px; background: white; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: none; }
+        .classification { font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
+        .human { color: green; }
+        .ai { color: red; }
+        .loading { text-align: center; color: #666; margin-top: 20px; display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>🔍 Forensisk Textanalys</h1>
+    <p>Klistra in en text nedan för att analysera om den är skriven av en människa eller AI.</p>
+    
+    <textarea id="inputText" placeholder="Klistra in text här..."></textarea>
+    <button id="analyzeBtn" onclick="analyzeText()">Analysera Text</button>
+    
+    <div id="loading" class="loading">Analyserar texten via Ollama...</div>
+
+    <div id="result">
+        <div id="classOutput" class="classification"></div>
+        <div id="justificationOutput"></div>
+    </div>
+
+    <script>
+        async function analyzeText() {
+            const text = document.getElementById('inputText').value;
+            const btn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+            const classOutput = document.getElementById('classOutput');
+            const justOutput = document.getElementById('justificationOutput');
+            
+            if (!text.trim()) return alert("Skriv in text!");
+
+            // Nollställ
+            resultDiv.style.display = 'none';
+            btn.disabled = true;
+            loading.style.display = 'block';
+            classOutput.className = 'classification'; // Ta bort färger
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                const fullText = data.result;
+
+                // LOGIK FÖR ATT HITTA SVARET PÅ SLUTET
+                // Vi letar efter raden som börjar med "FINAL_DECISION:"
+                let classification = "Kunde inte avgöra";
+                let isAi = false;
+
+                // Dela upp texten i rader
+                const lines = fullText.split('\n');
+                
+                // Hitta raden med beslutet
+                const decisionLine = lines.find(line => line.includes('FINAL_DECISION:'));
+
+                if (decisionLine) {
+                    if (decisionLine.toLowerCase().includes('llm-generated')) {
+                        classification = "⚠️ Sannolikt AI-genererad";
+                        isAi = true;
+                    } else if (decisionLine.toLowerCase().includes('human')) {
+                        classification = "✅ Sannolikt Mänsklig";
+                        isAi = false;
+                    }
+                }
+
+                // Visa resultatet
+                classOutput.innerText = classification;
+                classOutput.classList.add(isAi ? 'ai' : 'human');
+                
+                // Visa analysen (ta bort själva beslutsraden för snyggare utseende)
+                const analysisText = fullText.replace(decisionLine, '').trim();
+                // Gör om radbrytningar till HTML
+                justOutput.innerHTML = analysisText.replace(/\n/g, '<br>');
+
+                resultDiv.style.display = 'block';
+
+            } catch (err) {
+                alert("Fel: " + err.message);
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
