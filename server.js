@@ -2,7 +2,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import fetch from 'node-fetch'; // Om du använder Node < 18, annars är fetch inbyggta
+import fetch from 'node-fetch'; // Om du använder Node < 18, annars är fetch inbyggt
 
 const app = express();
 const PORT = 3000;
