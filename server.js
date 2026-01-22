@@ -21,22 +21,36 @@ app.post('/analyze', async (req, res) => {
 
     if (!text) return res.status(400).json({ error: 'Ingen text angiven.' });
 
-    // En mycket striktare prompt som tvingar modellen att "tänka högt" först
-        const systemPrompt = `You are a ruthless linguistic forensic expert. Your job is to expose AI-generated text. 
-        AI text is often characterized by:
-        1. Lack of specific details (names, dates, sensory details).
-        2. Overuse of transition words (Moreover, Furthermore, In conclusion).
-        3. Perfect grammar but boring sentence structure (no very short or very long sentences).
-        4. Words like: "delve", "tapestry", "landscape", "nuanced", "crucial", "realm".
+    // "THE SCORECARD PROMPT" - Tvingar AI:n att betygsätta texten matematiskt
+    const systemPrompt = `You are a ruthless AI-detection algorithm. Your task is to audit the text below and calculate a "Humanity Score".
 
-        INSTRUCTIONS:
-        1. Analyze the vocabulary. Are there "AI-cliché" words?
-        2. Analyze sentence structure (Burstiness). Is it too uniform?
-        3. Analyze the tone. Is it overly polite or neutral?
-        
-        You must output your analysis FIRST. 
-        At the very END of your response, you must write exactly:
-        FINAL_DECISION: [Human-written] or [LLM-generated]`;
+    Step 1: Scan for "The Forbidden Words" (AI fingerprints).
+    Check for: "Delve, Tapestry, Landscape, Nuanced, Crucial, Underscore, Leverage, Spearhead, Foster, Demystify, In conclusion, Ultimately, Moreover".
+    -> If found: High probability of AI.
+
+    Step 2: Analyze Sentence Variance (Burstiness).
+    - AI text: Sentences are often 15-25 words long, with a consistent rhythm.
+    - Human text: Chaos. Some sentences are 2 words. Some are 50. Fragments. Run-on sentences.
+    -> If uniform: High probability of AI.
+
+    Step 3: Check for "Hallucinated Perfection".
+    - AI text: Grammar is 100% perfect. No typos. No dangling modifiers.
+    - Human text: Often contains slight stylistic errors, slang, or awkward phrasing.
+    -> If perfect: High probability of AI.
+
+    Step 4: Check for Specificity.
+    - AI text: "It is important to consider various factors..." (Vague)
+    - Human text: "I dropped my coffee on the rug yesterday..." (Specific, Anecdotal)
+
+    REQUIRED RESPONSE FORMAT:
+    SCORECARD:
+    1. Vocabulary Analysis: [List any forbidden words found or note "Clean"]
+    2. Burstiness Check: [Describe if sentences are robotically smooth or chaotic]
+    3. Specificity Check: [Vague vs Concrete details]
+    
+    VERDICT REASONING: [Summarize the evidence above]
+
+    FINAL_DECISION: [Human-written] or [LLM-generated]`;
 
     const fullPrompt = `${systemPrompt}\n\nTEXT TO ANALYZE:\n"${text}"`;
 
@@ -45,16 +59,13 @@ app.post('/analyze', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: MODEL_NAME, // 'mistral' rekommenderas
+                model: MODEL_NAME, // Använd 'mistral' eller 'mistral-nemo'
                 prompt: fullPrompt,
                 stream: false,
-                
-                // HÄR ÄR NYCKELN TILL KONSEKVENS:
                 options: {
-                    temperature: 0.0,  // Ingen kreativitet
-                    seed: 42,          // Låser slumpgeneratorn (samma tal = samma svar)
-                    top_k: 1,          // Tvingar den att välja det absolut mest sannolika ordet
-                    top_p: 1.0         // Påverkar också urvalet, sätt till 1.0 när top_k är 1
+                    temperature: 0.0, // Måste vara 0 för maximal logik
+                    seed: 123,        // Låser resultatet
+                    num_ctx: 4096     // Ger den mer minne att läsa texten
                 }
             }),
         });
